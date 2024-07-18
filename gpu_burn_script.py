@@ -8,7 +8,7 @@ def output_print(window, window_offset_y, window_offset_x, window_height, window
     window.addstr(pady+1, 0, input)
     if pady+1 > window_height-4:
         pad_pos += int(len(input)/window_width) + 1
-    window.refresh(pad_pos, 0, window_offset_y, window_offset_x, min(curses.LINES-1, window_offset_y + window_height - 3), min(curses.COLS-1, window_offset_x + window_width - 5))
+    window.refresh(pad_pos, 0, window_offset_y, window_offset_x, window_height, window_width)
     return pad_pos
 
 def execute_shell_command(command):
@@ -80,6 +80,26 @@ def check_replay(gpu_percentage, burn_time, gpu_number, gpu_index, call_time, wi
 
     return pad_pos
 
+def read_class_code(bdf):
+    return execute_shell_command(f"lspci -s {bdf} -n | awk '{{print $3}}'")
+
+def read_header(bdf):
+    return execute_shell_command(f"setpci -s {bdf} HEADER_TYPE")
+
+def read_secondary_bus_number(bdf):
+    return execute_shell_command(f"setpci -s {bdf} SECONDARY_BUS")
+
+def read_slot_capabilities(bdf):
+    try:
+        slot_capabilities_output = subprocess.check_output(["setpci", "-s", bdf, "CAP_EXP+0X14.l"])
+        return slot_capabilities_output.decode().strip()
+    except subprocess.CalledProcessError:
+        return None
+
+def hex_to_binary(hex_string):
+    binary_string = format(int(hex_string, 16), '032b')
+    return binary_string
+
 def identify_gpus():
     command_output = execute_shell_command("lspci | cut -d ' ' -f 1")
     bdf_list = [num for num in command_output.split('\n') if num]
@@ -139,21 +159,6 @@ def get_vendor_bdf_list(vendor_id):
 def get_header_type(bdf):
     header_type = run_command(f"setpci -s {bdf} HEADER_TYPE")
     return header_type.strip()
-
-def get_secondary_bus_number(bdf):
-    secondary_bus_number = run_command(f"setpci -s {bdf} SECONDARY_BUS")
-    return secondary_bus_number.strip()
-
-def read_slot_capabilities(bdf):
-    try:
-        slot_capabilities_output = subprocess.check_output(["setpci", "-s", bdf, "CAP_EXP+0X14.l"])
-        return slot_capabilities_output.decode().strip()
-    except subprocess.CalledProcessError:
-        return None
-
-def hex_to_binary(hex_string):
-    binary_string = format(int(hex_string, 16), '032b')
-    return binary_string
 
 def main():
     check_replay(burn_time=10, gpu_number=4)
